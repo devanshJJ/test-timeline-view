@@ -10,7 +10,6 @@ public class timelineViewPlugin implements Plugin<Project> {
 
         // configuration for adding RunListener
         project.tasks.named('test'){
-            maxParallelForks 3
             jvmArgs "-javaagent:${classpath.find { it.name.contains('junit-foundation') }.absolutePath}"
             testLogging.showStandardStreams = true
         }
