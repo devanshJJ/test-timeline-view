@@ -25,11 +25,11 @@ dependencies{
     implementation 'junit:junit:4.13.1'
 }
 
-//pluginBundle {
-//    website = 'https://www.gradle.org/'
-//    vcsUrl='https://www.gradle.org/'
-//    tags = ['testing', 'integrationTesting', 'compatibility']
-//}
+pluginBundle {
+    website = 'https://github.com/devansh-Sprinklr/test-timeline-view'
+    vcsUrl='https://github.com/devansh-Sprinklr/test-timeline-view'
+    tags = ['testing', 'integrationTesting', 'compatibility']
+}
 
 gradlePlugin {
     plugins {
