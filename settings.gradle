@@ -1,0 +1,9 @@
+//pluginManagement{
+//    repositories{
+//        maven {
+//            url = uri("/Users/devanshjoshi/.m2/repository/")
+//        }
+//    }
+//}
+rootProject.name = 'test-timeline-view'
+

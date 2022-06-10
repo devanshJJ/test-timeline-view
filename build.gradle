@@ -1,0 +1,62 @@
+plugins {
+    id 'groovy'
+    id 'groovy-gradle-plugin'
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+    id "com.gradle.plugin-publish" version "1.0.0-rc-2"
+}
+
+group 'timeline.org.example'
+version '1.0'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+
+tasks.withType(Copy).all {
+    duplicatesStrategy 'exclude'
+}
+
+dependencies{
+    implementation 'junit:junit:4.13.1'
+}
+
+//pluginBundle {
+//    website = 'https://www.gradle.org/'
+//    vcsUrl='https://www.gradle.org/'
+//    tags = ['testing', 'integrationTesting', 'compatibility']
+//}
+
+gradlePlugin {
+    plugins {
+        timelineView {
+            id  ='timeline.org.example.timelineView'
+            displayName= 'timelineView'
+            description ='A plugin to provide test listener for Junit4 where it will listen and store result as json files and create HTML report'
+            implementationClass = 'timeline.org.example.timelineViewPlugin'
+        }
+    }
+}
+
+//task fatJar(type: Jar) {
+//    manifest {
+//        attributes 'Implementation-Title': 'Gradle Jar File Example',
+//                'Implementation-Version': version
+//    }
+//    baseName = project.name + '-all'
+//    from 'Lib/build/classes/java/main'
+//    from 'Lib/build/resources/main'
+//    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+//
+//    with jar
+//
+//    duplicatesStrategy 'include'
+//
+//}
+
+
+
