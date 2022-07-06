@@ -8,7 +8,7 @@ import org.gradle.api.tasks.TaskAction
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 
-public class TimelineViewPlugin implements Plugin<Project> {
+public class cle implements Plugin<Project> {
     @Override
     void apply(Project project) {
 
