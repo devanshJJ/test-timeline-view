@@ -1,2 +1,0 @@
-# extends org.junit.runner.notification.RunListener
-JunitTestResult.TheJunit4Listener

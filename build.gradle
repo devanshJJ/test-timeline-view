@@ -11,7 +11,6 @@ version '1.0'
 
 repositories {
     mavenCentral()
-    mavenLocal()
 }
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -21,42 +20,18 @@ tasks.withType(Copy).all {
     duplicatesStrategy 'exclude'
 }
 
-dependencies{
-    implementation 'junit:junit:4.13.1'
-}
 
-pluginBundle {
-    website = 'https://github.com/devansh-Sprinklr/test-timeline-view'
-    vcsUrl='https://github.com/devansh-Sprinklr/test-timeline-view'
-    tags = ['testing', 'integrationTesting', 'compatibility']
-}
+
 
 gradlePlugin {
     plugins {
         timelineView {
-            id  ='timeline.org.example.timelineView'
+            id  ='timeline.org.example.TimelineView'
             displayName= 'timelineView'
             description ='A plugin to provide test listener for Junit4 where it will listen and store result as json files and create HTML report'
-            implementationClass = 'timeline.org.example.timelineViewPlugin'
+            implementationClass = 'timeline.org.example.TimelineViewPlugin'
         }
     }
 }
-
-//task fatJar(type: Jar) {
-//    manifest {
-//        attributes 'Implementation-Title': 'Gradle Jar File Example',
-//                'Implementation-Version': version
-//    }
-//    baseName = project.name + '-all'
-//    from 'Lib/build/classes/java/main'
-//    from 'Lib/build/resources/main'
-//    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-//
-//    with jar
-//
-//    duplicatesStrategy 'include'
-//
-//}
-
 
 
