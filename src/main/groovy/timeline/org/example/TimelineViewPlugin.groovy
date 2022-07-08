@@ -8,7 +8,7 @@ import org.gradle.api.tasks.TaskAction
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 
-public class cle implements Plugin<Project> {
+public class TimelineViewPlugin implements Plugin<Project> {
     @Override
     void apply(Project project) {
 
@@ -63,11 +63,16 @@ class TimelineViewTask extends DefaultTask{
 
         //reading test results and storing in map
         def JSON_files =  project.file("${project.rootDir}/build/test-results/individual-test-results").listFiles()
+        int noOfTest=JSON_files.size()
         def mapClassToTestName = [:]
         def mapOwnerToTestName = [:]
         def mapTestNameToTestsRunResult  = [:]
+        def mapThreadNameToTestsRunResult  = [:]
         HashSet<String> set=new HashSet<String>()
         long executionStarted =System.currentTimeMillis()
+        long executionEnded =0
+
+        def minHeap = new PriorityQueue<Long>()
 
         JSON_files.each { File file ->
             if (file.isFile()) {
@@ -78,7 +83,16 @@ class TimelineViewTask extends DefaultTask{
                 set.add(parsedJson_result.Thread)
                 def list = []
                 executionStarted=Math.min(executionStarted,parsedJson_result.StartTime)
-
+                executionEnded=Math.max(executionEnded,parsedJson_result.EndTime)
+                if(minHeap.size()*10>=noOfTest){
+                    long tempTime=parsedJson_result.EndTime-parsedJson_result.StartTime
+                    if(tempTime>minHeap.peek()){
+                        minHeap.poll()
+                        minHeap.add(tempTime)
+                    }
+                }
+                else
+                minHeap.add(parsedJson_result.EndTime-parsedJson_result.StartTime)
                 //mapping test with className
                 String mapKey = parsedJson_result.name + "#" + parsedJson_result.className;
                 if (mapClassToTestName.containsKey(parsedJson_result.className)) {
@@ -87,6 +101,16 @@ class TimelineViewTask extends DefaultTask{
 
                 list.add(mapKey)
                 mapClassToTestName[parsedJson_result.className] = list
+
+                list=[]
+                if (mapThreadNameToTestsRunResult.containsKey(parsedJson_result.Thread)) {
+                    list = mapThreadNameToTestsRunResult[parsedJson_result.Thread]
+                }
+
+                list.add(mapKey)
+                mapThreadNameToTestsRunResult[parsedJson_result.Thread] = list
+
+
 
                 //if testOwner is specified, then map owner with test name
                 if (parsedJson_result.testOwner.length() > 0) {
@@ -112,35 +136,46 @@ class TimelineViewTask extends DefaultTask{
             }
         }
 
+
+        //----------------writing HTML file
         boolean append = true
         FileWriter fileWriter = new FileWriter(report, append)
         BufferedWriter buffWriter = new BufferedWriter(fileWriter)
 
         buffWriter.write("<html>\n")
         buffWriter.write("<head>\n")
+
+        //------------------some inline CSS
         buffWriter.write(" <style type=\"text/css\">\n" +
                 "        #r1:checked ~  #timeline-container{\n" +
                 "        display:inline-block !important;}\n" +
                 "\n" +
                 "         #r2:checked ~ #report-container {\n" +
                 "         display:block !important;}\n" +
-                " label:hover{\n" +
+                "         label:hover{\n" +
                 "         font-weight:bold;\n" +
                 "\n" +
                 "         }" +
                 "         #r3:checked ~ #Test-Ownership-container {\n" +
                         "         display:block !important;}\n" +
-                "body{margin:0;}\n"+
-                "    </style>\n");
+                "        body{margin:0;}\n"+
+                "        #radio-timeline:checked ~  #timeline{\n" +
+                "        display:block !important;}\n" +
+                "        #radio-timeline-highlight:checked ~  #timeline-highlighted{\n" +
+                "        visibility:visible !important;}"+
+                "        </style>\n");
 
 
+
+        //JS
         buffWriter.write("     <script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>\n")
         buffWriter.write("     <script type=\"text/javascript\">\n")
         buffWriter.write("      google.charts.load('current', {'packages':['timeline']});\n")
         buffWriter.write("      google.charts.setOnLoadCallback(drawChart);\n")
+        buffWriter.write("      google.charts.setOnLoadCallback(drawHighlightedChart);\n")
         buffWriter.write("      function drawChart() {\n")
-        buffWriter.write("        var container = document.getElementById('timeline');\n")
-        buffWriter.write("        var chart = new google.visualization.Timeline(container);\n")
+        buffWriter.write("        var timelineContainer = document.getElementById('timeline');\n")
+        buffWriter.write("        var chart = new google.visualization.Timeline(timelineContainer);\n")
         buffWriter.write("        var dataTable = new google.visualization.DataTable();\n")
         buffWriter.write("        dataTable.addColumn({ type: 'string', id: 'Thread' });\n")
         buffWriter.write("        dataTable.addColumn({ type: 'string', id: 'Name' });\n")
@@ -150,14 +185,11 @@ class TimelineViewTask extends DefaultTask{
         buffWriter.write("    dataTable.addRows([\n")
 
 
-
-
-
         DateFormat format = new SimpleDateFormat("yyyy,MM,dd,HH,mm,ss,SSS");
         format.setTimeZone(TimeZone.getTimeZone("GMT+5:30"));
 
         // giving result to google timeline chart to draw chart
-        mapClassToTestName.each{entry ->
+        mapThreadNameToTestsRunResult.each{entry ->
             def list=entry.value
             list.unique(false).each {
                 mapTestNameToTestsRunResult[it].sort{a, b -> a.StartTime-b.StartTime}
@@ -177,14 +209,13 @@ class TimelineViewTask extends DefaultTask{
                         startTime = startTime.substring(0, 20) + startTime.substring(21);
                         }
 
-                         if (parsedJson_result.result == "SUCCESS")
-                        buffWriter.write("      [ '${parsedJson_result.Thread}', '${parsedJson_result.name}','#93e078', new Date(${startTime}), new Date(${endTime}) ],\n")
+                         if (parsedJson_result.result == "SUCCESS"){
+                             buffWriter.write("      [ '${parsedJson_result.Thread}', '${parsedJson_result.name}','#93e078', new Date(${startTime}), new Date(${endTime}) ],\n")
+                         }
                          else {
-                        buffWriter.write("      [ '${parsedJson_result.Thread}', '${parsedJson_result.name}','red', new Date(${startTime}), new Date(${endTime}) ],\n")
-
-                    }
+                            buffWriter.write("      [ '${parsedJson_result.Thread}', '${parsedJson_result.name}','red', new Date(${startTime}), new Date(${endTime}) ],\n")
+                         }
                 }
-
             }
         }
 
@@ -192,27 +223,108 @@ class TimelineViewTask extends DefaultTask{
         buffWriter.write("    var options = {\n"+
                          "      timeline: { showRowLabels: false },alternatingRowStyle:false\n"+
                          "    };\n"+
-                         "    chart.draw(dataTable,options);\n"+
-                          "  }\n")
+                         "    chart.draw(dataTable,options);\n")
+        buffWriter.write("  }\n")
+
+
+
+
+
+
+
+
+
+        buffWriter.write("      function drawHighlightedChart() {\n")
+        buffWriter.write("        var highlightContainer = document.getElementById('timeline-highlighted');\n")
+        buffWriter.write("        var highlightedChart = new google.visualization.Timeline(highlightContainer);\n")
+        buffWriter.write("    var options = {\n"+
+                "      timeline: { showRowLabels: false },alternatingRowStyle:false\n"+
+                "    };\n")
+
+        // creating chart for highlighted elements
+        buffWriter.write("        var dataTableHighlighted = new google.visualization.DataTable();\n")
+        buffWriter.write("        dataTableHighlighted.addColumn({ type: 'string', id: 'Thread' });\n")
+        buffWriter.write("        dataTableHighlighted.addColumn({ type: 'string', id: 'Name' });\n")
+        buffWriter.write("        dataTableHighlighted.addColumn({ type: 'string', id: 'style', role: 'style' });\n")
+        buffWriter.write("        dataTableHighlighted.addColumn({ type: 'date', id: 'Start' });\n")
+        buffWriter.write("        dataTableHighlighted.addColumn({ type: 'date', id: 'End' });\n")
+        buffWriter.write("    dataTableHighlighted.addRows([\n")
+        mapThreadNameToTestsRunResult.each{entry ->
+            def list=entry.value
+            boolean atleastOneTest=false;
+
+            list.unique(false).each {
+
+                mapTestNameToTestsRunResult[it].sort{a, b -> a.StartTime-b.StartTime}
+                mapTestNameToTestsRunResult[it] .each {parsedJson_result->
+
+                    long tempTime=parsedJson_result.EndTime-parsedJson_result.StartTime
+                    if(tempTime>=minHeap.peek()){
+                        Date dateStart = new Date(parsedJson_result.StartTime-executionStarted);
+                        String startTime = format.format(dateStart);
+                        Date dateEnd = new Date(parsedJson_result.EndTime-executionStarted);
+                        String endTime = format.format(dateEnd);
+                        atleastOneTest=true;
+                        // making date format work with google chart
+                        if (endTime.charAt(20) == '0') {
+                            endTime = endTime.substring(0, 20) + endTime.substring(21)
+                        }
+                        if (startTime.charAt(20) == '0') {
+                            startTime = startTime.substring(0, 20) + startTime.substring(21);
+                        }
+                        buffWriter.write("      [ '${parsedJson_result.Thread}', '${parsedJson_result.name}','#ff6a33', new Date(${startTime}), new Date(${endTime}) ],\n")
+                    }
+                }
+            }
+            if(!atleastOneTest){
+                Date dateStart = new Date(1);
+                String startTime = format.format(dateStart);
+                buffWriter.write("      [ '${entry.key}', '','white', new Date(${startTime}), new Date(${startTime}) ],\n")
+            }
+        }
+
+        buffWriter.write("]);\n")
+        buffWriter.write("    highlightedChart.draw(dataTableHighlighted,options);\n")
+        buffWriter.write("  }\n")
 
 
         buffWriter.write("function report_decrease_timelinezoom () {\n" +
-                "              const item=document.getElementById('timeline');\n" +
-                "               const noOfDigitsInHeight=item.style.width.length\n"+
-                "            var initial=parseInt(item.style.width.substring(0,noOfDigitsInHeight-1))-100\n" +
-                "          if(initial>=100){\n" +
+                " const radio1=document.getElementById('radio-timeline');\n" +
+                " var currentChart='';\n" +
+                " if(radio1.checked) {\n" +
+                "   currentChart='timeline';\n" +
+                " }\n" +
+                " else{\n" +
+                "   currentChart='timeline-highlighted';\n" +
+                "                }"+
+                " const item=document.getElementById(currentChart);\n" +
+                " const noOfDigitsInHeight=item.style.width.length\n"+
+                " var initial=parseInt(item.style.width.substring(0,noOfDigitsInHeight-1))-100\n" +
+                " if(initial>=100){\n" +
                 "           item.style.width=initial+\"%\";\n" +
-                "           console.log(item.style.width)\n" +
-                "           drawChart();\n" +
+                "            if(radio1.checked){\n" +
+                "           drawChart();}\n" +
+                "           else{\n" +
+                "           drawHighlightedChart();}\n" +
                 "         }\n" +
                 "    }\n");
         buffWriter.write("  function report_increase_timelinezoom () {\n" +
-                "       const item=document.getElementById('timeline');\n" +
+                " const radio1=document.getElementById('radio-timeline');\n" +
+                " var currentChart='';\n" +
+                " if(radio1.checked) {\n" +
+                "   currentChart='timeline';\n" +
+                " }\n" +
+                " else{\n" +
+                "   currentChart='timeline-highlighted';\n" +
+                "                }"+
+                "       const item=document.getElementById(currentChart);\n" +
                 "               const noOfDigitsInHeight=item.style.width.length\n"+
                 "          var initial=parseInt(item.style.width.substring(0,noOfDigitsInHeight-1))+100\n" +
                 "           item.style.width=initial+\"%\";\n" +
-                "           console.log(item.style.width)\n" +
-                "           drawChart();\n" +
+                "               if(radio1.checked){\n" +
+                "           drawChart();}\n" +
+                "           else{\n" +
+                "           drawHighlightedChart();}\n" +
                 "    }\n")
 
         buffWriter.write(" function toggleVisibility(e){\n" +
@@ -224,7 +336,6 @@ class TimelineViewTask extends DefaultTask{
                 "       }\n" +
                 "       else\n" +
                 "       item.style.display=\"none\";\n" +
-                "  console.log(\"clicked\"+item)\n" +
                 "\n" +
                 "\n" +
                 "\n" +
@@ -258,10 +369,20 @@ class TimelineViewTask extends DefaultTask{
         buffWriter.write("<div style=\"width: 97%; position: relative; margin:auto; \">\n")
         buffWriter.write("    <button onClick=\"report_decrease_timelinezoom()\"  style=\" position: relative;float:right; cursor:pointer; font-size:1.5rem; border: solid 2px #dbdbdb; padding:0px 7px;\">-</button>\n")
         buffWriter.write("     <button onClick=\"report_increase_timelinezoom()\"  style=\" position: relative;float:right; cursor:pointer;font-size:1.5rem; border: solid 2px #dbdbdb; padding:0px 5px;\">+</button>\n")
-        buffWriter.write("<div style=\"width: 100%; position: relative; margin:auto; overflow-x: scroll;overflow-y:hidden;\">\n")
-        buffWriter.write("<div id=\"timeline\" style=\"width:100%;  height:${120+40*set.size()}px\"></div>\n")
+        buffWriter.write("<div style=\"width: 100%;height:${120+40*set.size()}px; position: relative; margin:auto; overflow-x: scroll;overflow-y:hidden;\">\n")
+        buffWriter.write("<input type=\"radio\"  style=\"visibility:hidden\" id=\"radio-timeline\" name=\"timelineContainer\"checked >\n" +
+                "    <input type=\"radio\" style=\"visibility:hidden\" id=\"radio-timeline-highlight\" name=\"timelineContainer\" >")
+        buffWriter.write("<div id=\"timeline\" style=\"width:100%;  height:${120+40*set.size()}px;display:none;\"></div>\n")
+        buffWriter.write("<div id=\"timeline-highlighted\" style=\"width:100%;  height:${120+40*set.size()}px;visibility:hidden;\"></div>\n")
+
+
         buffWriter.write("</div>\n")
         buffWriter.write("</div>\n")
+        buffWriter.write("<label for=\"radio-timeline\" style=\"cursor:pointer\"><span style=\"background-color:#93e078; font-size:1rem; padding:5px; font-weight:bold; color:white;\">-</span> Timeline view of execution of all tests.</label>\n" +
+                "    <br>\n" +
+                "    <br>\n" +
+                "    <label for=\"radio-timeline-highlight\" style=\"cursor:pointer;\"><span style=\"background-color:#ff6a33; font-size:1rem; padding:5px; font-weight:bold; color:white;\">-</span> Timeline view of execution of test with 90 percentile in runtime.</label>\n"
+             )
         buffWriter.write("</div>\n")
 
 
